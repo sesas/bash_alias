@@ -1,0 +1,130 @@
+#!/usr/bin/perl
+#
+# alc
+#
+# create an Alias for one of the Last Commands
+#
+# we have these two lines in $HOME/.bash_alias:
+#
+# alias  alc='history|tail -80>~/.tmpbashalias;
+#             ~/bin/alc; [ -f ./.al ] && . ./.al'
+# alias galc="history|tail -80>~/.tmpbashalias; ~/bin/alc g;. ~/.bash_alias"
+#
+use strict;
+use warnings;
+use English;
+
+sub prompt {
+    my ($prompt) = @_;
+
+    print $prompt;
+    my $s = <STDIN>;
+    $s =~ s{ \A \s* | \s* \z}{}gxms;
+    return $s;
+}
+
+sub empty {
+    my ($s) = @_;
+    return $s =~ m{ \A \s* \z }xms;
+}
+
+sub digits {
+    my ($s) = @_;
+    return $s =~ m{ \A \d+ \z }xms;
+}
+
+my $global = @ARGV && $ARGV[0] eq 'g';
+
+my $tmp = "$ENV{HOME}/.tmpbashalias";   # from command history
+open my $in, '<', $tmp
+    or die "cannot open $tmp: $OS_ERROR\n";
+my @cmds = <$in>;
+close $in;
+pop @cmds;                              # the last one is the
+                                        # call to THIS program.
+# clean them up
+for my $cmd (@cmds) {
+    $cmd =~ s{ \A \s+ \d+ \s+ }{}xms;   # leading numbers
+    $cmd =~ s{ \s+ \z }{}xms;           # trailing spaces
+}
+
+#
+# eliminate the short (<= 3) commands and the duplicates.
+# do this trimming starting from the end so that the last
+# command we typed is sure to be at the end.
+#
+# show only 9 - that's enough.  any more would just be noise.
+# if $ENV{NALIASES} is defined use that instead.
+#
+my %seen;
+@cmds = reverse 
+        grep { ! (length() <= 3 || $seen{$_}++) }
+        reverse
+        @cmds;
+@cmds = @cmds[ -($ENV{NALIASES} || 9) .. -1 ];
+my $i = 1;
+for my $cmd (@cmds) {
+    printf "%2d %s\n", $i++, $cmd; 
+}
+my $line = prompt("Which command and what"
+      . ($global? ' global': '')
+      . " alias? ");
+if (empty($line)) {
+    die "aborted\n"
+}
+sub okay_num {
+    my ($s) = @_;
+    if ($s =~ m{\D}xms || $s == 0 || $s > @cmds) {
+        die "illegal command number: $s\n";
+    }
+}
+my @aliases;
+my ($which, $alias);
+
+# 2 tt
+if (($which, $alias) = $line =~ m{\A (\d+) \s+ (\S+) \z}xms) {
+    okay_num($which);
+    push @aliases, [ $alias, $cmds[$which-1] ];
+}
+# tt
+elsif (($alias) = $line =~ m{\A (\D\S*) \z}xms) {
+    push @aliases, [ $alias, $cmds[-1] ];
+}
+# 2
+elsif (($which) = $line =~ m{\A (\d+) \z}xms) {
+    okay_num($which);
+    my $alias = prompt("What alias? ");
+    if (empty($alias)) {
+        die "aborted: no alias given\n";
+    }
+    push @aliases, [ $alias,  $cmds[$which-1] ];
+}
+# 2 tt 5 ss
+else {
+    my @terms = reverse split ' ', $line;
+    if (@terms % 2 == 1) {
+        die "must be an even number of terms\n";
+    }
+    my %cmd_for = @terms;
+    for my $k (keys %cmd_for) {
+        okay_num($cmd_for{$k});
+        $cmd_for{$k} = $cmds[$cmd_for{$k}-1];
+        push @aliases, [ $k, $cmd_for{$k} ];
+    }
+}
+
+my $aliasfile = ($global)? "$ENV{HOME}/.bash_alias": '.al';
+open my $af, '>>', $aliasfile
+    or die "cannot open $aliasfile: $OS_ERROR\n";
+for my $aref (@aliases) {
+    my ($alias, $cmd) = @$aref;
+    # mess around with '" quotes
+    # double quotes can be escaped with \
+    # apparently single quotes cannot
+    my $q = ($cmd =~ m{'}xms)? '"': "'";
+    if ($q eq '"') {
+        $cmd =~ s{"}{\\"}xmsg;
+    }
+    print {$af} "alias $alias=$q$cmd$q\n";
+}
+close $af;

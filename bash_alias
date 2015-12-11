@@ -1,0 +1,17 @@
+#
+# the following make it very convenient to create aliases
+# for getting to the current directory and to make
+# an alias for one of the commands you recently entered.
+#
+# acd  - alias current directory
+# adir - see the aliases for switching directories
+# alc  - alias last commands into .al - the local alias file
+# galc - alias last commands into $HOME/.bash_alias - the global alias file
+# al   - edit the local aliases (in the current directory)
+# ga   - edit the global aliases
+#
+alias  alc='history|tail -80>~/.tmpbashalias; ~/bin/alc  ; [ -f ./.al ] && . ./.al'
+alias galc='history|tail -80>~/.tmpbashalias; ~/bin/alc g; . ~/.bash_alias'
+alias acd='~/bin/acd; . ~/.bash_alias'
+alias ga='${FCEDIT:-${EDITOR:-vi}} ~/.bash_alias; . ~/.bash_alias'
+alias al='${FCEDIT:-${EDITOR:-vi}} .al;[ -f ./.al ] && . ./.al'

@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use English;
+
+#
+# adir
+#
+# display the Aliases for changing DIRectories.
+# they were created with acd (which is different than OCD).
+#
+
+my $long = @ARGV && $ARGV[0] eq '-l';
+
+my @aliases;
+
+my $fname = "$ENV{HOME}/.bash_alias";
+open my $in, '<', $fname
+    or die "cannot open $fname: $OS_ERROR\n";
+while (my $line = <$in>) {
+    if (my ($alias, $dir) =
+            $line =~ m{
+                alias
+                \s+
+                (\w+)       # the alias for the dir
+                =
+                "cd
+                \s+
+                ([^;]+);    # the directory itself
+                \s*
+                pwd 
+            }xsm)
+    {
+        if (! -f "$dir/.al" && -w $dir) {
+            open my $al, '>', "$dir/.al";      # just to touch it
+        }
+        if (!$long) {
+            $dir =~ s{.*/}{}xms;
+        }
+        push @aliases, "$alias\t$dir\n";
+    }
+}
+close $in;
+print sort { lc $a cmp lc $b } @aliases;
